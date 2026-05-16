@@ -9,7 +9,35 @@ import os
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+from typing import Optional
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Supabase (optional — app works without it, falls back to client localStorage)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        from supabase import create_client
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("Supabase connected")
+    except Exception as e:
+        print(f"Supabase init failed: {e}")
+
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+app = FastAPI(title="Polymarket LP Scanner API", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/analyze")
 async def analyze_market(body: dict):
@@ -44,33 +72,6 @@ End with BUY / PASS / WAIT on its own line.""",
         data = resp.json()
         text = next((b["text"] for b in data.get("content", []) if b.get("type") == "text"), "")
         return {"analysis": text}
-from typing import Optional
-from datetime import datetime, timezone
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# Supabase (optional — app works without it, falls back to client localStorage)
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        from supabase import create_client
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("Supabase connected")
-    except Exception as e:
-        print(f"Supabase init failed: {e}")
-
-app = FastAPI(title="Polymarket LP Scanner API", version="2.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 GAMMA_BASE = "https://gamma-api.polymarket.com"
 HEADERS    = {"User-Agent": "PolymarketLPScanner/2.0", "Accept": "application/json"}
