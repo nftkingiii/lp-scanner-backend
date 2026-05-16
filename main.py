@@ -9,6 +9,41 @@ import os
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+@app.post("/analyze")
+async def analyze_market(body: dict):
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Anthropic API key not configured")
+    
+    market = body.get("market", {})
+    
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 1000,
+                "system": """You are a sharp Polymarket LP analyst specialising in maker reward farming.
+The user places resting limit orders near the midpoint to earn maker rewards without getting filled.
+Tone: direct, no fluff, no bullet lists. Format: 3 short paragraphs.
+Cover: odds stability assessment, informed trader risk, pool share advantage, and a clear verdict.
+End with BUY / PASS / WAIT on its own line.""",
+                "messages": [{
+                    "role": "user",
+                    "content": body.get("prompt", "")
+                }]
+            }
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = next((b["text"] for b in data.get("content", []) if b.get("type") == "text"), "")
+        return {"analysis": text}
 from typing import Optional
 from datetime import datetime, timezone
 from dotenv import load_dotenv
